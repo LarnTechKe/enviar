@@ -17,6 +17,7 @@ import (
 // WorkerPool manages job handlers, middleware, and periodic schedules.
 type WorkerPool interface {
 	AddJobHandlers(handlers ...JobHandler)
+	AddKnownJobNames(names ...string)
 	AddRecurringJobs(cronTaskMap map[string]string)
 	Start(ctx context.Context)
 	Stop()
@@ -52,6 +53,23 @@ func (wp *workerPool) AddJobHandlers(handlers ...JobHandler) {
 
 		wrapped := wp.wrapJobHandler(h)
 		wp.pool.JobWithOptions(job.Name(), opts, wrapped)
+	}
+}
+
+// AddKnownJobNames registers job names that this pool does not handle but
+// that may be enqueued with a delay (EnqueueBodyIn) from this process.
+// Without this, the scheduler/requeuer Lua script will not recognise the
+// job name when the delay expires and will send the job to the dead queue
+// with "unknown job when requeueing".
+func (wp *workerPool) AddKnownJobNames(names ...string) {
+	noop := func(job *work.Job) error { return nil }
+	for _, name := range names {
+		wp.pool.JobWithOptions(name, work.JobOptions{
+			Priority:       1,
+			MaxFails:       0,
+			SkipDead:       true,
+			MaxConcurrency: 0,
+		}, noop)
 	}
 }
 
