@@ -61,16 +61,12 @@ func (wp *workerPool) AddJobHandlers(handlers ...JobHandler) {
 // Without this, the scheduler/requeuer Lua script will not recognise the
 // job name when the delay expires and will send the job to the dead queue
 // with "unknown job when requeueing".
+//
+// Unlike AddJobHandlers, these names are only added to the requeuer/scheduler
+// so that delayed jobs are moved into their work queues on time. Workers in
+// this pool will NOT fetch or process jobs from these queues.
 func (wp *workerPool) AddKnownJobNames(names ...string) {
-	noop := func(job *work.Job) error { return nil }
-	for _, name := range names {
-		wp.pool.JobWithOptions(name, work.JobOptions{
-			Priority:       1,
-			MaxFails:       0,
-			SkipDead:       true,
-			MaxConcurrency: 0,
-		}, noop)
-	}
+	wp.pool.AddKnownJobNames(names...)
 }
 
 // AddRecurringJobs registers cron-scheduled periodic jobs.
